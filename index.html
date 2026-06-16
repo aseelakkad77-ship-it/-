@@ -1,0 +1,867 @@
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+import { 
+  initializeFirestore, persistentLocalCache, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, getDoc, setDoc, getDocs 
+} from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+
+// ─── إعدادات Firebase العامة ───
+const firebaseConfig = {
+  apiKey: "AIzaSyCe660Vzhrw8j1ipY2ewaygox3IM47sibA",
+  authDomain: "my-charger-app.firebaseapp.com",
+  projectId: "my-charger-app",
+  storageBucket: "my-charger-app.firebasestorage.app",
+  messagingSenderId: "370638579420",
+  appId: "1:370638579420:web:f9bb95ba180cadd6e23619",
+  measurementId: "G-5KPLYTGEK7"
+};
+
+// تهيئة Firebase وتفعيل التخزين المؤقت أوفلاين (Offline Cache) لتسريع التطبيق وحفظ البيانات محلياً
+const app = initializeApp(firebaseConfig);
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({})
+});
+
+// ─── المتغيرات العامة للتطبيق ───
+let currentOwner = null;
+let appInitialized = false;
+let CHARGE_COST = 1;
+let customers = [];
+let currentTab = 'dashboard';
+let selectedId = null;
+let archFilter = 'all';
+let activeModalId = null;
+let custRef = null;
+
+// ─── تسجيل دخول تلقائي عند فتح التطبيق ───
+(async function autoLogin() {
+  try {
+    const saved = localStorage.getItem('nq_session');
+    if (!saved) return;
+    const session = JSON.parse(saved);
+    if (!session.owner) return;
+
+    const today = new Date().toISOString().split('T')[0];
+    
+    // جلب بيانات الموزع من السحابة للتحقق من صلاحية الاشتراك
+    const ownerDoc = await getDoc(doc(db, "owners", session.owner));
+    
+    if (!ownerDoc.exists()) {
+      localStorage.removeItem('nq_session');
+      return;
+    }
+
+    const ownerData = ownerDoc.data();
+    if (today > ownerData.expiry) {
+      localStorage.removeItem('nq_session');
+      return;
+    }
+
+    // دخول تلقائي ناجح
+    currentOwner = session.owner;
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('user-tag').style.display = 'flex';
+    document.getElementById('logout-btn').style.display = 'block';
+    document.getElementById('settings-btn').style.display = 'block';
+    document.getElementById('admin-btn').style.display = 'block';
+    document.getElementById('user-phone').textContent = session.owner;
+    
+    if (ownerData.defaultChargeCost != null) {
+      CHARGE_COST = ownerData.defaultChargeCost;
+    } else {
+      const savedCost = localStorage.getItem('charge_cost_' + session.owner);
+      if (savedCost) CHARGE_COST = parseFloat(savedCost);
+    }
+    
+    initApp();
+  } catch(e) { console.error('autoLogin error:', e); }
+})();
+
+// ─── محاولة تسجيل الدخول ───
+window.attemptLogin = async function() {
+  const username = document.getElementById('l-phone').value.trim();
+  const pass  = document.getElementById('l-pass').value.trim();
+  const today = new Date().toISOString().split('T')[0];
+  const errEl = document.getElementById('login-error');
+  const btn = document.querySelector('.login-btn');
+
+  if(!username || !pass) return;
+
+  try {
+    btn.textContent = "جاري التحقق...";
+    btn.disabled = true;
+
+    // جلب بيانات المستخدم من فايربيز مباشرة
+    const ownerDocRef = doc(db, "owners", username);
+    const ownerDoc = await getDoc(ownerDocRef);
+
+    if (!ownerDoc.exists() || ownerDoc.data().pass !== pass) {
+      errEl.textContent = '❌ اسم المستخدم أو كلمة المرور غير صحيحة!';
+      errEl.style.display = 'block';
+      document.getElementById('l-pass').value = '';
+      btn.textContent = "دخول إلى لوحة التحكم";
+      btn.disabled = false;
+      return;
+    }
+
+    const ownerData = ownerDoc.data();
+
+    if (today > ownerData.expiry) {
+      errEl.textContent = '⛔ انتهى اشتراكك. تواصل مع الإدارة للتجديد.';
+      errEl.style.display = 'block';
+      btn.textContent = "دخول إلى لوحة التحكم";
+      btn.disabled = false;
+      return;
+    }
+
+    // دخول ناجح
+    errEl.style.display = 'none';
+    currentOwner = username;
+    localStorage.setItem('nq_session', JSON.stringify({ owner: username }));
+    
+    if (ownerData.defaultChargeCost != null) {
+      CHARGE_COST = ownerData.defaultChargeCost;
+    } else {
+      const savedCost = localStorage.getItem('charge_cost_' + username);
+      if (savedCost) CHARGE_COST = parseFloat(savedCost);
+    }
+
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('user-tag').style.display = 'flex';
+    document.getElementById('logout-btn').style.display = 'block';
+    document.getElementById('settings-btn').style.display = 'block';
+    document.getElementById('admin-btn').style.display = 'block';
+    document.getElementById('user-phone').textContent = username;
+    
+    btn.textContent = "دخول إلى لوحة التحكم";
+    btn.disabled = false;
+
+    initApp();
+
+  } catch(e) {
+    errEl.textContent = '❌ حدث خطأ في الاتصال بالسحابة.';
+    errEl.style.display = 'block';
+    btn.textContent = "دخول إلى لوحة التحكم";
+    btn.disabled = false;
+  }
+}
+
+// ─── تسجيل الخروج ───
+window.doLogout = function() {
+  if (!confirm('هل تريد تسجيل الخروج؟')) return;
+  localStorage.removeItem('nq_session');
+  currentOwner = null;
+  appInitialized = false;
+  custRef = null;
+  customers = [];
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('user-tag').style.display = 'none';
+  document.getElementById('logout-btn').style.display = 'none';
+  document.getElementById('settings-btn').style.display = 'none';
+  document.getElementById('admin-btn').style.display = 'none';
+  document.getElementById('l-phone').value = '';
+  document.getElementById('l-pass').value = '';
+}
+
+// ─── يُشغَّل بعد تسجيل الدخول فقط ───
+function initApp() {
+  if (appInitialized) return;
+  appInitialized = true;
+
+  custRef = collection(db, "owners", currentOwner, "customers");
+
+  onSnapshot(query(custRef, orderBy("createdAt", "desc")), (snapshot) => {
+    customers = [];
+    snapshot.forEach((docSnap) => {
+      customers.push({ id: docSnap.id, ...docSnap.data() });
+    });
+    
+    renderStats();
+    renderList();
+    if (selectedId) renderDetail();
+    if (currentTab === 'archive') renderArchive();
+  });
+}
+
+// ─── Utils ───
+function todayStr() { return new Date().toISOString().split('T')[0]; }
+function fmtDate(d) {
+  if (!d) return '—';
+  const [y,m,day] = d.split('-');
+  return `${day}/${m}/${y}`;
+}
+function fmtDT(iso) {
+  if (!iso) return '—';
+  const dt = new Date(iso);
+  const d = dt.getDate().toString().padStart(2,'0');
+  const mo = (dt.getMonth()+1).toString().padStart(2,'0');
+  const h = dt.getHours().toString().padStart(2,'0');
+  const mi = dt.getMinutes().toString().padStart(2,'0');
+  return `${d}/${mo}/${dt.getFullYear()} ${h}:${mi}`;
+}
+function calcBalance(c) {
+  let b = 0;
+  if (!c.transactions) return 0;
+  for (const t of c.transactions) {
+    if (t.type === 'topup' || t.type === 'debt_payment') b += t.amount;
+    else if (t.type === 'charge') b -= CHARGE_COST;
+  }
+  return Math.round(b * 100) / 100;
+}
+function chargesToday(c) {
+  if (!c.transactions) return 0;
+  return c.transactions.filter(t => t.type === 'charge' && t.date.startsWith(todayStr())).length;
+}
+function getBadge(c) {
+  const b = calcBalance(c);
+  if (b > 5)   return { label:`رصيد: ${b} ₪`,       color:'#16a34a', bg:'#dcfce7' };
+  if (b > 0)   return { label:`منخفض: ${b} ₪`,      color:'#d97706', bg:'#fef3c7' };
+  if (b === 0) return { label:'الرصيد صفر',         color:'#64748b', bg:'#f1f5f9' };
+  return              { label:`دين: ${Math.abs(b)} ₪`, color:'#dc2626', bg:'#fee2e2' };
+}
+
+// ─── Toast ───
+function showToast(msg, color='#16a34a') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = color;
+  t.style.display = 'block';
+  setTimeout(() => {
+    t.style.opacity = '0';
+    setTimeout(() => {
+      t.style.display = 'none';
+      t.style.opacity = '1';
+    }, 300);
+  }, 2500);
+}
+
+// ─── Navigation ───
+window.goTab = function(tab) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  currentTab = tab;
+  selectedId = null;
+  document.getElementById('page-'+tab).classList.add('active');
+  const idx = ['dashboard','add','archive'].indexOf(tab);
+  document.querySelectorAll('.nav-btn')[idx].classList.add('active');
+  if (tab === 'dashboard') { renderStats(); renderList(); }
+  if (tab === 'archive') renderArchive();
+}
+
+window.goBack = function() {
+  selectedId = null;
+  document.getElementById('page-detail').classList.remove('active');
+  document.getElementById('page-dashboard').classList.add('active');
+  renderStats(); renderList();
+  document.querySelectorAll('.nav-btn').forEach((b,i) => b.classList.toggle('active', i===0));
+}
+
+window.showDetail = function(id) {
+  selectedId = id;
+  document.getElementById('page-dashboard').classList.remove('active');
+  document.getElementById('page-detail').classList.add('active');
+  renderDetail();
+}
+
+// ─── Stats ───
+function renderStats() {
+  const totalDebt = customers.reduce((s,c) => { const b=calcBalance(c); return b<0 ? s+Math.abs(b) : s; }, 0);
+  const todayChg = customers.reduce((s,c) => s+chargesToday(c), 0);
+  const todayRevenue = customers.reduce((s,c) => {
+    if (!c.transactions) return s;
+    return s + c.transactions
+      .filter(t => t.type === 'charge' && t.date.startsWith(todayStr()))
+      .reduce((sum, t) => sum + t.amount, 0);
+  }, 0);
+
+  document.getElementById('s-total').textContent = customers.length;
+  document.getElementById('s-debt').textContent = totalDebt.toFixed(0) + ' ₪';
+  document.getElementById('s-revenue').textContent = todayRevenue.toFixed(0) + ' ₪';
+  document.getElementById('s-today').textContent = todayChg;
+}
+
+// ─── قائمة الزبائن ───
+window.renderList = function(q='') {
+  const inp = document.getElementById('srch-inp');
+  if (!q && inp) q = inp.value;
+  const filtered = customers.filter(c =>
+    c.name.toLowerCase().includes(q.toLowerCase()) || (c.phone && c.phone.includes(q))
+  );
+  
+  const el = document.getElementById('cust-list');
+  if (!filtered.length) { 
+    el.innerHTML = '<div class="empty">📭 لا يوجد زبائن مطابقين للبحث</div>'; 
+    return; 
+  }
+  
+  el.innerHTML = filtered.map(c => {
+    const bd = getBadge(c);
+    const bl = calcBalance(c);
+    const avBg = bl < 0 ? '#fee2e2' : bl === 0 ? '#f1f5f9' : '#dcfce7';
+    const avCl = bl < 0 ? '#dc2626' : bl === 0 ? '#64748b' : '#16a34a';
+    const chgd = chargesToday(c) > 0;
+    
+    return `<div class="card">
+      <div class="card-l" onclick="showDetail('${c.id}')">
+        <div class="av" style="background:${avBg};color:${avCl}">${c.name.charAt(0)}</div>
+        <div>
+          <div class="card-name">${esc(c.name)}${chgd?'<span class="dot">⚡ شحن اليوم</span>':''}</div>
+          <div class="card-sub">${c.phone || 'بدون رقم هاتف'}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="badge" style="color:${bd.color};background:${bd.bg}">${bd.label}</span>
+        <button class="q-btn" onclick="doCharge('${c.id}')" title="شحن سريع الآن">⚡</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ─── تفاصيل الزبون ───
+function renderDetail() {
+  const c = customers.find(x => x.id === selectedId);
+  if (!c) return;
+  
+  const bl = calcBalance(c);
+  const totalChg = c.transactions ? c.transactions.filter(t=>t.type==='charge').length : 0;
+  const totalPd  = c.transactions ? c.transactions.filter(t=>t.type==='topup'||t.type==='debt_payment').reduce((s,t)=>s+t.amount,0) : 0;
+  
+  const avBg = bl < 0 ? '#fee2e2' : '#dbeafe';
+  const avCl = bl < 0 ? '#dc2626' : '#1d4ed8';
+  const balBg = bl < 0 ? '#fef2f2' : bl === 0 ? '#f8fafc' : '#f0fdf4';
+  const balBr = bl < 0 ? '#fecaca' : bl === 0 ? '#e2e8f0' : '#bbf7d0';
+  const balCl = bl < 0 ? '#dc2626' : bl === 0 ? '#64748b' : '#16a34a';
+  
+  const warnHTML = bl < 0
+    ? `<div class="warn-tag" style="color:#dc2626;background:#fee2e2">⚠️ يوجد دين مستحق بقيمة: ${Math.abs(bl)} ₪</div>`
+    : '';
+
+  const debtBtn = bl < 0
+    ? `<button class="btn-orng" onclick="openDebtModal('${c.id}')">🧾 سداد الدين</button>`
+    : '';
+
+  const balText = bl < 0
+    ? `رصيدك عندنا: دين ${Math.abs(bl)} شيكل، يرجى السداد.`
+    : bl === 0
+      ? `رصيدك عندنا: صفر شيكل، يرجى شحن الرصيد.`
+      : `رصيدك عندنا: ${bl} شيكل.`;
+  const smsBody = encodeURIComponent(`السلام عليكم ${c.name}، ${balText}`);
+  const smsHref = `sms:${esc(c.phone)}${/iPhone|iPad|iPod/i.test(navigator.userAgent) ? '&' : '?'}body=${smsBody}`;
+
+  const contactBtns = c.phone ? `
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <a href="tel:${esc(c.phone)}" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;background:#dcfce7;border-radius:10px;color:#16a34a;font-weight:700;font-size:14px;text-decoration:none;">
+        📞 اتصال
+      </a>
+      <a href="${smsHref}" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;background:#dbeafe;border-radius:10px;color:#2563eb;font-weight:700;font-size:14px;text-decoration:none;">
+        💬 رسالة
+      </a>
+      <a href="https://wa.me/${c.phone.replace(/[^0-9]/g,'')}?text=${smsBody}" target="_blank" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;background:#dcfce7;border-radius:10px;color:#059669;font-weight:700;font-size:14px;text-decoration:none;">
+        🟢 واتساب
+      </a>
+    </div>` : '';
+
+  const TXL = {topup:'شحن رصيد', charge:'شحنة', debt_payment:'سداد دين'};
+  const TXC = {topup:'#16a34a', charge:'#2563eb', debt_payment:'#059669'};
+  const TXS = {topup:'+', charge:'−', debt_payment:'+'};
+  const TXI = {topup:'💵', charge:'⚡', debt_payment:'✅'};
+
+  const txHTML = c.transactions ? [...c.transactions].reverse().map(t =>
+    `<div class="tx-row">
+      <div>
+        <div class="tx-name" style="color:${TXC[t.type]}">${TXI[t.type]} ${TXL[t.type]}</div>
+        <div class="tx-date">${fmtDT(t.date)}</div>
+      </div>
+      <div style="font-weight:800;color:${TXC[t.type]};font-size:16px">${TXS[t.type]}${t.amount} ₪</div>
+    </div>`
+  ).join('') : '<div class="empty">لا توجد معاملات مسجلة حتى الآن</div>';
+
+  document.getElementById('detail-content').innerHTML = `
+    <div class="d-hdr">
+      <div class="big-av" style="background:${avBg};color:${avCl}">${c.name.charAt(0)}</div>
+      <div>
+        <div class="d-name">${esc(c.name)}</div>
+        ${c.phone ? `<div class="d-sub">📞 ${esc(c.phone)}</div>` : ''}
+        <div class="d-sub">📅 مسجل منذ: ${fmtDate(c.createdAt)}</div>
+        ${c.note ? `<div class="d-sub" style="color:#f59e0b;font-weight:600;">📝 ${esc(c.note)}</div>` : ''}
+      </div>
+    </div>
+    
+    ${contactBtns}
+    
+    <div class="bal-box" style="background:${balBg};border:2px solid ${balBr}">
+      <div style="font-size:14px;font-weight:700;color:var(--text-muted);margin-bottom:8px">الرصيد الحالي</div>
+      <div class="bal-n" style="color:${balCl}">${bl > 0 ? '+' : ''}${bl} ₪</div>
+      ${warnHTML}
+    </div>
+    
+    <div class="mini-stats">
+      <div class="mini-s"><div class="mini-n">${totalChg}</div><div class="mini-l">إجمالي الشحنات</div></div>
+      <div class="mini-s"><div class="mini-n">${totalPd} ₪</div><div class="mini-l">إجمالي المدفوعات</div></div>
+      <div class="mini-s"><div class="mini-n">${chargesToday(c)}</div><div class="mini-l">شحنات اليوم</div></div>
+    </div>
+    
+    <div class="act-row">
+      <button class="btn-blue" onclick="openChargeModal('${c.id}')">⚡ تسجيل شحنة</button>
+      <button class="btn-green" onclick="openTopupModal('${c.id}')">💵 إضافة رصيد</button>
+      ${debtBtn}
+      <button class="btn-red" onclick="deleteCust('${c.id}')" title="حذف الزبون">🗑️</button>
+    </div>
+    
+    <div class="tx-section">
+      <div class="tx-title">📋 سجل حركات الزبون</div>
+      ${txHTML}
+    </div>`;
+}
+
+// ─── الأرشيف ───
+window.setArchFilter = function(v, btn) {
+  archFilter = v;
+  document.querySelectorAll('.tog-btn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  renderArchive();
+}
+
+function renderArchive() {
+  const TXL = {topup:'شحن رصيد', charge:'شحنة', debt_payment:'سداد دين'};
+  const TXC = {topup:'#16a34a', charge:'#2563eb', debt_payment:'#059669'};
+  const TXS = {topup:'+', charge:'−', debt_payment:'+'};
+  const TXI = {topup:'💵', charge:'⚡', debt_payment:'✅'};
+
+  const allTx = customers.flatMap(c => c.transactions ? c.transactions.map(t => ({...t, cName:c.name})) : []);
+  const today = todayStr();
+
+  const todayTx  = allTx.filter(t => t.date.startsWith(today));
+  const todayCharges = todayTx.filter(t => t.type === 'charge');
+  const todayRevenue = todayCharges.reduce((s,t) => s + t.amount, 0);
+  const todayTopup   = todayTx.filter(t => t.type === 'topup').reduce((s,t) => s + t.amount, 0);
+  const todayDebt    = todayTx.filter(t => t.type === 'debt_payment').reduce((s,t) => s + t.amount, 0);
+
+  document.getElementById('arch-daily-summary').innerHTML = `
+    <div style="background:#eff6ff;border-radius:12px;padding:14px;text-align:center;border:1.5px solid #bfdbfe">
+      <div style="font-size:22px;font-weight:900;color:#2563eb">${todayCharges.length}</div>
+      <div style="font-size:12px;color:#64748b;font-weight:600;margin-top:3px">⚡ شحنات اليوم</div>
+    </div>
+    <div style="background:#f0fdf4;border-radius:12px;padding:14px;text-align:center;border:1.5px solid #bbf7d0">
+      <div style="font-size:22px;font-weight:900;color:#16a34a">${todayRevenue.toFixed(0)} ₪</div>
+      <div style="font-size:12px;color:#64748b;font-weight:600;margin-top:3px">💰 استقبلت اليوم</div>
+    </div>
+    <div style="background:#fefce8;border-radius:12px;padding:14px;text-align:center;border:1.5px solid #fef08a">
+      <div style="font-size:22px;font-weight:900;color:#ca8a04">${todayTopup.toFixed(0)} ₪</div>
+      <div style="font-size:12px;color:#64748b;font-weight:600;margin-top:3px">💵 رصيد مُضاف</div>
+    </div>
+    <div style="background:#fff7ed;border-radius:12px;padding:14px;text-align:center;border:1.5px solid #fed7aa">
+      <div style="font-size:22px;font-weight:900;color:#ea580c">${todayDebt.toFixed(0)} ₪</div>
+      <div style="font-size:12px;color:#64748b;font-weight:600;margin-top:3px">✅ ديون مُسدَّدة</div>
+    </div>`;
+
+  const all = allTx
+    .sort((a,b) => b.date.localeCompare(a.date))
+    .filter(t => archFilter === 'all' || t.type === archFilter);
+
+  document.getElementById('arch-count').textContent = `إجمالي الحركات: ${all.length} معاملة`;
+  const el = document.getElementById('arch-list');
+
+  if (!all.length) {
+    el.innerHTML = '<div class="empty">📭 لا توجد معاملات لعرضها</div>';
+    return;
+  }
+
+  el.innerHTML = all.map(t => {
+    const avBg = t.type === 'charge' ? '#eff6ff' : '#dcfce7';
+    const avCl = t.type === 'charge' ? '#2563eb' : '#16a34a';
+    const isToday = t.date.startsWith(today);
+    return `<div class="card" style="${isToday ? 'border-right:3px solid #3b82f6' : ''}">
+      <div class="card-l">
+        <div class="av" style="background:${avBg};color:${avCl};font-size:20px">${TXI[t.type]}</div>
+        <div>
+          <div class="card-name">${esc(t.cName)}${isToday ? '<span class="dot">اليوم</span>' : ''}</div>
+          <div class="card-sub">${TXL[t.type]} • ${fmtDT(t.date)}</div>
+        </div>
+      </div>
+      <div style="font-weight:800;font-size:16px;color:${TXC[t.type]}">${TXS[t.type]}${t.amount} ₪</div>
+    </div>`;
+  }).join('');
+}
+
+// ─── إضافة زبون ───
+window.checkForm = function() {
+  document.getElementById('f-submit').disabled = !document.getElementById('f-name').value.trim();
+  updateHint();
+}
+function updateHint() {
+  const v = parseFloat(document.getElementById('f-bal').value) || 0;
+  document.getElementById('f-hint').classList.toggle('hidden', v > 0);
+}
+window.setPre = function(v) {
+  document.getElementById('f-bal').value = v;
+  document.querySelectorAll('#page-add .pre-btn').forEach(b => b.classList.toggle('on', b.textContent.trim() === v+' ₪'));
+  updateHint();
+}
+window.clearPre = function() {
+  document.querySelectorAll('#page-add .pre-btn').forEach(b => b.classList.remove('on'));
+}
+
+window.addCustomer = async function() {
+  const name = document.getElementById('f-name').value.trim();
+  if (!name) return;
+  
+  const initBal = parseFloat(document.getElementById('f-bal').value) || 0;
+  const txs = initBal > 0 ? [{
+    id: Date.now(), date: new Date().toISOString(),
+    type: 'topup', amount: initBal, note: 'رصيد ابتدائي'
+  }] : [];
+  
+  const c = {
+    name,
+    phone: document.getElementById('f-phone').value.trim(),
+    note: document.getElementById('f-note').value.trim(),
+    createdAt: todayStr(),
+    transactions: txs,
+  };
+  
+  try {
+    await addDoc(custRef, c);
+    document.getElementById('f-name').value = '';
+    document.getElementById('f-phone').value = '';
+    document.getElementById('f-bal').value = '';
+    document.getElementById('f-note').value = '';
+    document.getElementById('f-submit').disabled = true;
+    document.getElementById('f-hint').classList.remove('hidden');
+    document.querySelectorAll('#page-add .pre-btn').forEach(b => b.classList.remove('on'));
+    
+    showToast(`✅ تم إضافة الزبون ${c.name} بنجاح السحابي`);
+    goTab('dashboard');
+  } catch (error) {
+    showToast(`❌ حدث خطأ أثناء الحفظ: ${error.message}`, '#dc2626');
+  }
+}
+
+// ─── تنفيذ الشحنة مباشرة بالسعر المحفوظ ───
+window.doCharge = async function(cid) {
+  const c = customers.find(x => x.id === cid);
+  if (!c) return;
+
+  const bal = calcBalance(c);
+  const updatedTransactions = c.transactions ? [...c.transactions] : [];
+  updatedTransactions.push({
+    id: Date.now(), date: new Date().toISOString(),
+    type: 'charge', amount: CHARGE_COST,
+    note: bal < CHARGE_COST ? 'شحنة (تم تسجيلها كدين)' : 'شحنة عادية',
+  });
+
+  try {
+    const docDoc = doc(db, "owners", currentOwner, "customers", cid);
+    await updateDoc(docDoc, { transactions: updatedTransactions });
+    const nb = bal - CHARGE_COST;
+    if (nb < 0) {
+      showToast(`⚠️ تم الشحن لـ ${c.name} (على الحساب) — الدين: ${Math.abs(nb).toFixed(0)} ₪`, '#dc2626');
+    } else {
+      showToast(`⚡ تم الشحن لـ ${c.name} — الرصيد المتبقي: ${nb.toFixed(0)} ₪`);
+    }
+  } catch (error) {
+    showToast(`❌ فشل تحديث الشحنة: ${error.message}`, '#dc2626');
+  }
+}
+
+// ─── مودالات و إعدادات ───
+window.openChargeModal = function(cid) {
+  const c = customers.find(x => x.id === cid);
+  if (!c) return;
+  activeModalId = cid;
+  document.getElementById('charge-modal-name').textContent = `الزبون: ${c.name}`;
+  document.getElementById('charge-price-inp').value = CHARGE_COST;
+  document.querySelectorAll('#charge-pre-row .pre-btn').forEach(b => {
+    b.classList.toggle('on', parseFloat(b.textContent) === CHARGE_COST);
+  });
+  document.getElementById('charge-modal').classList.remove('hidden');
+}
+
+window.doChargeModal = async function() {
+  const priceVal = parseFloat(document.getElementById('charge-price-inp').value);
+  if (!priceVal || priceVal <= 0) { showToast('⚠️ أدخل سعر الشحنة', '#f59e0b'); return; }
+  const c = customers.find(x => x.id === activeModalId);
+  if (!c) return;
+  const bal = calcBalance(c);
+  const updatedTransactions = c.transactions ? [...c.transactions] : [];
+  updatedTransactions.push({
+    id: Date.now(), date: new Date().toISOString(),
+    type: 'charge', amount: priceVal,
+    note: bal < priceVal ? 'شحنة (تم تسجيلها كدين)' : 'شحنة عادية',
+  });
+  try {
+    const docDoc = doc(db, "owners", currentOwner, "customers", activeModalId);
+    await updateDoc(docDoc, { transactions: updatedTransactions });
+    const nb = bal - priceVal;
+    closeModal('charge-modal');
+    if (nb < 0) {
+      showToast(`⚠️ تم الشحن لـ ${c.name} (على الحساب) — الدين: ${Math.abs(nb).toFixed(0)} ₪`, '#dc2626');
+    } else {
+      showToast(`⚡ تم الشحن لـ ${c.name} — ${priceVal} ₪ — الرصيد: ${nb.toFixed(0)} ₪`);
+    }
+  } catch (error) {
+    showToast(`❌ فشل تحديث الشحنة: ${error.message}`, '#dc2626');
+  }
+}
+
+window.openTopupModal = function(cid) {
+  const c = customers.find(x => x.id === cid);
+  activeModalId = cid;
+  document.getElementById('topup-name').textContent = `الزبون: ${c.name}`;
+  document.getElementById('topup-amt').value = '';
+  document.querySelectorAll('#topup-modal .pre-btn').forEach(b => b.classList.remove('on'));
+  document.getElementById('topup-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('topup-amt').focus(), 100);
+}
+
+window.doTopup = async function() {
+  const amt = parseFloat(document.getElementById('topup-amt').value);
+  if (!amt || amt <= 0) return;
+  
+  const c = customers.find(x => x.id === activeModalId);
+  const updatedTransactions = c.transactions ? [...c.transactions] : [];
+  updatedTransactions.push({ id:Date.now(), date:new Date().toISOString(), type:'topup', amount:amt, note:'إضافة رصيد' });
+  
+  try {
+    const docDoc = doc(db, "owners", currentOwner, "customers", activeModalId);
+    await updateDoc(docDoc, { transactions: updatedTransactions });
+    showToast(`💵 تم إضافة ${amt} ₪ لرصيد ${c.name} بنجاح`);
+    closeModal('topup-modal');
+  } catch (error) {
+    showToast(`❌ فشل الشحن السحابي`, '#dc2626');
+  }
+}
+
+window.openDebtModal = function(cid) {
+  const c = customers.find(x => x.id === cid);
+  activeModalId = cid;
+  const debt = Math.abs(calcBalance(c));
+  document.getElementById('debt-name').textContent = `الزبون: ${c.name} | الدين المستحق: ${debt} ₪`;
+  document.getElementById('debt-amt').value = '';
+  document.getElementById('debt-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('debt-amt').focus(), 100);
+}
+
+window.doDebtPay = async function() {
+  const amt = parseFloat(document.getElementById('debt-amt').value);
+  if (!amt || amt <= 0) return;
+  
+  const c = customers.find(x => x.id === activeModalId);
+  const updatedTransactions = c.transactions ? [...c.transactions] : [];
+  updatedTransactions.push({ id:Date.now(), date:new Date().toISOString(), type:'debt_payment', amount:amt, note:'سداد دين' });
+  
+  try {
+    const docDoc = doc(db, "owners", currentOwner, "customers", activeModalId);
+    await updateDoc(docDoc, { transactions: updatedTransactions });
+    showToast(`✅ تم تسجيل سداد بقيمة ${amt} ₪ بنجاح`);
+    closeModal('debt-modal');
+  } catch (error) {
+    showToast(`❌ فشل تسجيل السداد سحابياً`, '#dc2626');
+  }
+}
+
+window.deleteCust = async function(cid) {
+  if (!confirm('هل أنت متأكد من حذف هذا الزبون نهائياً من السحابة؟ لا يمكن التراجع.')) return;
+  try {
+    await deleteDoc(doc(db, "owners", currentOwner, "customers", cid));
+    goBack();
+    showToast('🗑️ تم حذف الزبون من السحابة بنجاح');
+  } catch (error) {
+    showToast(`❌ فشل الحذف السحابي`, '#dc2626');
+  }
+}
+
+window.openSettingsModal = function() {
+  document.getElementById('default-charge-inp').value = CHARGE_COST;
+  document.querySelectorAll('#settings-modal .pre-btn').forEach(b => {
+    b.classList.toggle('on', parseFloat(b.textContent) === CHARGE_COST);
+  });
+  document.getElementById('settings-modal').classList.remove('hidden');
+}
+
+window.saveDefaultCharge = async function() {
+  const val = parseFloat(document.getElementById('default-charge-inp').value);
+  if (!val || val <= 0) { showToast('⚠️ أدخل سعراً صحيحاً', '#f59e0b'); return; }
+  CHARGE_COST = val;
+  localStorage.setItem('charge_cost_' + currentOwner, val);
+  try {
+    const ownerDocRef = doc(db, "owners", currentOwner);
+    await setDoc(ownerDocRef, { defaultChargeCost: val }, { merge: true });
+  } catch(e) {}
+  closeModal('settings-modal');
+  showToast(`✅ تم حفظ سعر الشحنة الافتراضي: ${val} ₪`);
+}
+
+window.doChargeFromDetail = function(cid) { window.doCharge(cid); }
+
+window.closeModal = function(id) {
+  const modal = document.getElementById(id);
+  modal.style.opacity = '0';
+  setTimeout(() => {
+    modal.classList.add('hidden');
+    modal.style.opacity = '1';
+    activeModalId = null;
+  }, 200);
+}
+
+window.setModalPre = function(inputId, v, btn) {
+  document.getElementById(inputId).value = v;
+  btn.closest('.modal').querySelectorAll('.pre-btn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ══════════════════════════════════════════
+// نظام لوحة المشرف المربوط بـ Firebase
+// ══════════════════════════════════════════
+const ADMIN_USER = "Aseel.kh";
+const ADMIN_PASS = "2006910";
+
+window.openAdminLogin = function() {
+  document.getElementById('admin-login-screen').classList.remove('hidden');
+  document.getElementById('admin-user').value = '';
+  document.getElementById('admin-pass').value = '';
+  document.getElementById('admin-login-error').style.display = 'none';
+  setTimeout(() => document.getElementById('admin-user').focus(), 100);
+}
+
+window.closeAdminLogin = function() {
+  document.getElementById('admin-login-screen').classList.add('hidden');
+}
+
+window.attemptAdminLogin = function() {
+  const u = document.getElementById('admin-user').value.trim();
+  const p = document.getElementById('admin-pass').value.trim();
+  const errEl = document.getElementById('admin-login-error');
+  if (u === ADMIN_USER && p === ADMIN_PASS) {
+    document.getElementById('admin-login-screen').classList.add('hidden');
+    openAdminPanel();
+  } else {
+    errEl.style.display = 'block';
+    document.getElementById('admin-pass').value = '';
+  }
+}
+
+async function openAdminPanel() {
+  document.getElementById('admin-panel-overlay').classList.remove('hidden');
+  await renderOwnersList();
+  const nextYear = new Date();
+  nextYear.setFullYear(nextYear.getFullYear() + 1);
+  document.getElementById('new-owner-expiry').value = nextYear.toISOString().split('T')[0];
+}
+
+window.closeAdminPanel = function() {
+  document.getElementById('admin-panel-overlay').classList.add('hidden');
+}
+
+async function renderOwnersList() {
+  const el = document.getElementById('owners-list');
+  el.innerHTML = '<div style="text-align:center;color:#64748b;padding:20px;font-size:14px">جاري تحميل بيانات الموزعين...</div>';
+
+  try {
+    const snapshot = await getDocs(collection(db, "owners"));
+    const today = new Date().toISOString().split('T')[0];
+    
+    if (snapshot.empty) {
+      el.innerHTML = '<div style="text-align:center;color:#64748b;padding:20px;font-size:14px">لا يوجد أصحاب نقاط مسجّلون</div>';
+      return;
+    }
+
+    let html = '';
+    snapshot.forEach((docSnap) => {
+      const phone = docSnap.id;
+      const data = docSnap.data();
+      
+      // تفادي عرض الأخطاء إذا لم يكن للموزع تاريخ انتهاء أو كلمة مرور
+      if(!data.expiry || !data.pass) return;
+
+      const expired = today > data.expiry;
+      const expiryClass = expired ? 'owner-expiry-exp' : 'owner-expiry-ok';
+      const expiryLabel = expired ? '⛔ منتهي' : '✅ فعّال';
+      const [y,m,d] = data.expiry.split('-');
+      
+      html += `<div class="owner-card">
+        <div class="owner-info">
+          <div class="owner-phone">📱 ${esc(phone)}</div>
+          <div class="owner-meta">
+            🔑 ${esc(data.pass)} &nbsp;|&nbsp;
+            📅 ينتهي: ${d}/${m}/${y} &nbsp;
+            <span class="${expiryClass}" style="color:${expired ? '#dc2626' : '#16a34a'}; font-weight:bold;">${expiryLabel}</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-del-owner" style="color:#2563eb; background:#dbeafe;" onclick="renewOwner('${esc(phone)}')">🔄 تجديد</button>
+          <button class="btn-del-owner" onclick="deleteOwner('${esc(phone)}')">🗑️ حذف</button>
+        </div>
+      </div>`;
+    });
+    el.innerHTML = html;
+  } catch (error) {
+    el.innerHTML = '<div style="text-align:center;color:#dc2626;padding:20px;font-size:14px">❌ فشل تحميل الموزعين من السحابة</div>';
+  }
+}
+
+window.addOwner = async function() {
+  const phone  = document.getElementById('new-owner-phone').value.trim();
+  const pass   = document.getElementById('new-owner-pass').value.trim();
+  const expiry = document.getElementById('new-owner-expiry').value;
+  const msgEl  = document.getElementById('admin-msg');
+
+  if (!phone || !pass || !expiry) {
+    showAdminMsg('⚠️ يرجى ملء جميع الحقول', '#fef3c7', '#92400e');
+    return;
+  }
+
+  try {
+    const ownerDocRef = doc(db, "owners", phone);
+    await setDoc(ownerDocRef, { pass: pass, expiry: expiry }, { merge: true });
+    
+    document.getElementById('new-owner-phone').value = '';
+    document.getElementById('new-owner-pass').value = '';
+    showAdminMsg(`✅ تم إضافة ${phone} بنجاح!`, '#dcfce7', '#15803d');
+    
+    await renderOwnersList();
+  } catch (error) {
+    showAdminMsg(`❌ فشل إضافة الموزع للسحابة`, '#fee2e2', '#dc2626');
+  }
+}
+
+window.deleteOwner = async function(phone) {
+  if (!confirm(`هل تريد حذف الموزع ${phone} نهائياً؟\n(ملاحظة: زبائن هذا الموزع لن يتم حذفهم من قاعدة البيانات لتجنب ضياع الحقوق)`)) return;
+  
+  try {
+    await deleteDoc(doc(db, "owners", phone));
+    showAdminMsg(`🗑️ تم حذف ${phone}`, '#fee2e2', '#dc2626');
+    await renderOwnersList();
+  } catch (error) {
+    showAdminMsg(`❌ فشل الحذف من السحابة`, '#fee2e2', '#dc2626');
+  }
+}
+
+window.renewOwner = async function(phone) {
+  const newExpiry = prompt(`أدخل تاريخ الانتهاء الجديد لـ ${phone} (YYYY-MM-DD):`);
+  if (!newExpiry || !/^\d{4}-\d{2}-\d{2}$/.test(newExpiry)) {
+    if(newExpiry !== null) alert('صيغة التاريخ غير صحيحة. مثال: 2027-12-31');
+    return;
+  }
+  
+  try {
+    await updateDoc(doc(db, "owners", phone), { expiry: newExpiry });
+    showAdminMsg(`✅ تم تجديد اشتراك ${phone} حتى ${newExpiry}`, '#dcfce7', '#15803d');
+    await renderOwnersList();
+  } catch (error) {
+    showAdminMsg(`❌ فشل تجديد الاشتراك السحابي`, '#fee2e2', '#dc2626');
+  }
+}
+
+function showAdminMsg(text, bg, color) {
+  const el = document.getElementById('admin-msg');
+  el.textContent = text;
+  el.style.background = bg;
+  el.style.color = color;
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 3000);
+}
+</script>
