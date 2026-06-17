@@ -742,8 +742,16 @@ window.deleteOwner = async function(phone) {
     showAdminMsg(`🗑️ تم حذف ${phone}`, '#fee2e2', '#dc2626');
     renderOwnersList();
   } catch (e) { showAdminMsg('❌ فشل الحذف', '#fee2e2', '#dc2626'); }
-}
-
 function showAdminMsg(text, bg, color) {
-  const el = document.getElementById('
-
+  const el = document.getElementById('admin-msg');
+  if (el) {
+    el.textContent = text;
+    el.style.backgroundColor = bg;
+    el.style.color = color;
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 3000);
+  }
+}
+</script>
+</body>
+</html>
