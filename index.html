@@ -3,755 +3,594 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>نقطة شحن</title>
+<title>نقطة شحن - النظام المتكامل والمطور</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
 <style>
-  /* ─── إعدادات عامة ─── */
+  /* ─── إعدادات عامة وتنسيق الموبايل ─── */
   :root {
-    --bg-color: #f8fafc;
+    --bg-color: #f1f5f9;
     --card-bg: #ffffff;
-    --primary: #3b82f6;
-    --primary-hover: #2563eb;
-    --text-main: #1e293b;
+    --primary: #2563eb;
+    --primary-hover: #1d4ed8;
+    --success: #10b981;
+    --danger: #ef4444;
+    --text-main: #0f172a;
     --text-muted: #64748b;
     --border-color: #e2e8f0;
-    --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
     --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
     --radius: 12px;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { 
+  
+  html, body { 
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
     background: var(--bg-color); 
     color: var(--text-main); 
     min-height: 100vh; 
-    display: flex;
-    flex-direction: column;
+    overflow-x: hidden;
+    width: 100%;
   }
 
-  /* ─── الهيدر ─── */
   .hdr { 
     background: #0f172a; 
-    padding: 0 16px; 
-    position: sticky; 
-    top: 0; 
-    z-index: 100; 
-    box-shadow: var(--shadow-md); 
-  }
-  .hdr-in { 
-    max-width: 900px; 
-    margin: 0 auto; 
-    display: flex; 
-    align-items: center; 
-    justify-content: space-between; 
-    padding: 14px 0; 
-    gap: 12px; 
-    flex-wrap: wrap; 
-  }
-  .logo { display: flex; align-items: center; gap: 8px; font-size: 22px; font-weight: 800; color: #f8fafc; letter-spacing: 0.5px;}
-  .nav { display: flex; gap: 8px; }
-  .nav-btn { 
-    display: flex; align-items: center; gap: 6px; padding: 8px 16px; 
-    border-radius: 8px; border: none; background: transparent; 
-    color: #94a3b8; cursor: pointer; font-size: 14px; font-weight: 600; 
-    transition: all 0.2s ease; 
-  }
-  .nav-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
-  .nav-btn.active { background: var(--primary); color: #fff; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4); }
-
-  /* ─── الحاوية الرئيسية ─── */
-  .body { max-width: 900px; margin: 0 auto; padding: 24px 16px; flex: 1; width: 100%; }
-
-  /* ─── التنبيهات (Toast) ─── */
-  #toast { 
-    position: fixed; top: 20px; left: 50%; transform: translateX(-50%); 
-    color: #fff; padding: 12px 24px; border-radius: 50px; font-weight: 700; 
-    font-size: 15px; z-index: 9999; box-shadow: 0 10px 25px rgba(0,0,0,0.2); 
-    white-space: nowrap; display: none; transition: opacity 0.3s;
-  }
-
-  /* ─── الإحصائيات ─── */
-  .grid4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; margin-bottom: 20px; }
-  .stat-box { 
-    background: var(--card-bg); border-radius: var(--radius); padding: 18px; 
-    box-shadow: var(--shadow-sm); transition: transform 0.2s; 
-  }
-  .stat-box:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
-  .stat-n { font-size: 28px; font-weight: 800; }
-  .stat-l { font-size: 13px; color: var(--text-muted); margin-top: 4px; font-weight: 500; }
-
-  /* ─── البحث ─── */
-  .srch { 
-    width: 100%; padding: 14px 20px; border-radius: var(--radius); 
-    border: 1px solid var(--border-color); font-size: 15px; outline: none; 
-    background: var(--card-bg); margin-bottom: 20px; box-shadow: var(--shadow-sm);
-    transition: border-color 0.2s, box-shadow 0.2s;
-  }
-  .srch:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
-
-  /* ─── القوائم والبطاقات ─── */
-  .list { display: flex; flex-direction: column; gap: 12px; }
-  .card { 
-    background: var(--card-bg); border-radius: var(--radius); padding: 14px 18px; 
-    display: flex; align-items: center; justify-content: space-between; 
-    box-shadow: var(--shadow-sm); transition: transform 0.2s, box-shadow 0.2s; 
-  }
-  .card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
-  .card-l { display: flex; align-items: center; gap: 14px; cursor: pointer; flex: 1; }
-  .av { 
-    width: 44px; height: 44px; border-radius: 50%; display: flex; 
-    align-items: center; justify-content: center; font-weight: 700; 
-    font-size: 18px; flex-shrink: 0; 
-  }
-  .card-name { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px; color: var(--text-main); }
-  .dot { font-size: 11px; color: var(--primary); background: #eff6ff; padding: 3px 8px; border-radius: 12px; font-weight: 600; }
-  .card-sub { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
-  .badge { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 20px; white-space: nowrap; }
-  .q-btn { 
-    background: #eff6ff; border: none; border-radius: 10px; width: 40px; height: 40px; 
-    cursor: pointer; font-size: 18px; display: flex; align-items: center; 
-    justify-content: center; flex-shrink: 0; transition: background 0.2s, transform 0.1s; 
-  }
-  .q-btn:hover { background: #dbeafe; transform: scale(1.05); }
-  .empty { text-align: center; color: var(--text-muted); padding: 40px 0; font-size: 16px; font-weight: 500; }
-
-  /* ─── تفاصيل الزبون ─── */
-  .back-btn { 
-    background: none; border: none; color: var(--text-muted); cursor: pointer; 
-    font-size: 15px; margin-bottom: 16px; padding: 8px 12px; font-weight: 600; 
-    display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; transition: background 0.2s;
-  }
-  .back-btn:hover { background: #e2e8f0; color: var(--text-main); }
-  .d-card { background: var(--card-bg); border-radius: 16px; padding: 24px; box-shadow: var(--shadow-md); }
-  .d-hdr { display: flex; gap: 16px; margin-bottom: 20px; align-items: center; }
-  .big-av { width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 24px; flex-shrink: 0; }
-  .d-name { font-weight: 800; font-size: 22px; color: var(--text-main); }
-  .d-sub { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
-  .bal-box { border-radius: 16px; padding: 20px; margin-bottom: 20px; text-align: center; }
-  .bal-n { font-size: 42px; font-weight: 900; }
-  .warn-tag { margin-top: 10px; font-size: 14px; font-weight: 700; border-radius: 8px; padding: 8px 16px; display: inline-block; }
-  .mini-stats { display: flex; gap: 12px; margin-bottom: 20px; }
-  .mini-s { flex: 1; background: var(--bg-color); border-radius: 12px; padding: 14px 0; text-align: center; border: 1px solid var(--border-color); }
-  .mini-n { font-weight: 800; font-size: 18px; color: var(--text-main); }
-  .mini-l { font-size: 12px; color: var(--text-muted); margin-top: 4px; font-weight: 600; }
-  .act-row { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
-  .tx-section { border-top: 1px solid var(--border-color); padding-top: 20px; }
-  .tx-title { font-weight: 800; font-size: 16px; margin-bottom: 12px; color: var(--text-main); }
-  .tx-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--bg-color); }
-  .tx-row:last-child { border-bottom: none; }
-  .tx-name { font-size: 14px; font-weight: 700; }
-  .tx-date { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
-
-  /* ─── النماذج (Forms) ─── */
-  .form-card { background: var(--card-bg); border-radius: 16px; padding: 28px; max-width: 500px; margin: 0 auto; box-shadow: var(--shadow-md); }
-  .form-title { font-weight: 800; font-size: 22px; margin-bottom: 24px; color: var(--text-main); text-align: center; }
-  label { display: block; font-weight: 700; font-size: 14px; color: var(--text-main); margin-bottom: 8px; margin-top: 18px; }
-  input[type=text], input[type=tel], input[type=number], input[type=date], input[type=password] { 
-    width: 100%; padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border-color); 
-    font-size: 15px; outline: none; background: #fafafa; font-family: inherit; transition: all 0.2s;
-  }
-  input:focus { border-color: var(--primary); background: #fff; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
-  .pre-row { display: flex; gap: 10px; margin: 10px 0; }
-  .pre-btn { 
-    flex: 1; padding: 10px 0; border-radius: 10px; border: 2px solid var(--border-color); 
-    background: #fff; cursor: pointer; font-size: 15px; font-weight: 700; color: var(--text-muted); 
-    transition: all 0.2s;
-  }
-  .pre-btn:hover { border-color: #cbd5e1; color: var(--text-main); }
-  .pre-btn.on { border-color: var(--primary); background: #eff6ff; color: var(--primary-hover); }
-  .hint { font-size: 13px; color: #dc2626; background: #fee2e2; border-radius: 8px; padding: 10px 14px; margin-top: 10px; font-weight: 600; }
-
-  /* ─── الأزرار العامة ─── */
-  .btn-primary { 
-    margin-top: 24px; width: 100%; padding: 14px 0; background: var(--primary); 
-    color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: 800; 
-    cursor: pointer; font-family: inherit; transition: background 0.2s, transform 0.1s; 
-  }
-  .btn-primary:hover:not(:disabled) { background: var(--primary-hover); transform: translateY(-1px); }
-  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-  
-  .btn-blue, .btn-green, .btn-orng, .btn-red, .btn-gray { 
-    padding: 10px 18px; color: #fff; border: none; border-radius: 10px; 
-    font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; 
-    transition: filter 0.2s, transform 0.1s; flex: 1; text-align: center;
-  }
-  .btn-blue:hover, .btn-green:hover, .btn-orng:hover, .btn-red:hover, .btn-gray:hover { filter: brightness(0.9); transform: translateY(-1px); }
-  .btn-blue  { background: #2563eb; }
-  .btn-green { background: #16a34a; }
-  .btn-orng  { background: #f59e0b; }
-  .btn-red   { background: #fee2e2; color: #dc2626; flex: none; }
-  .btn-gray  { background: #f1f5f9; color: #374151; }
-
-  /* ─── المودال (النافذة المنبثقة) ─── */
-  .overlay { 
-    position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); 
-    backdrop-filter: blur(4px); display: flex; align-items: center; 
-    justify-content: center; z-index: 999; padding: 16px; 
-    animation: fadeIn 0.2s ease-out;
-  }
-  .modal { 
-    background: #fff; border-radius: 20px; padding: 24px; width: 100%; 
-    max-width: 380px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); 
-    animation: slideUp 0.3s ease-out;
-  }
-  .modal-title { font-weight: 800; font-size: 20px; margin-bottom: 6px; color: var(--text-main); }
-  .modal-sub { font-size: 15px; color: var(--text-muted); margin-bottom: 18px; font-weight: 500; }
-  .modal-btns { display: flex; gap: 10px; margin-top: 20px; }
-
-  /* ─── تذييل الحقوق (Footer) ─── */
-  .footer {
+    color: #fff; 
+    padding: 20px; 
     text-align: center;
-    padding: 20px 16px;
-    margin-top: auto;
-    color: var(--text-muted);
-    font-size: 14px;
-    font-weight: 600;
+    box-shadow: var(--shadow-md);
   }
-  .footer span {
+  .hdr h1 { font-size: 22px; margin-bottom: 5px; letter-spacing: 1px; }
+  .hdr p { font-size: 13px; color: #94a3b8; }
+
+  .container {
+    max-width: 500px;
+    margin: 20px auto;
+    padding: 0 15px;
+  }
+
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 22px;
+    box-shadow: var(--shadow-md);
+    margin-bottom: 25px;
+  }
+
+  h2 { font-size: 18px; margin-bottom: 18px; color: #1e3a8a; text-align: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px; }
+
+  .form-group { margin-bottom: 14px; text-align: right; }
+  label { display: block; font-size: 13px; margin-bottom: 5px; color: var(--text-muted); font-weight: 600; }
+  input {
+    width: 100%;
+    padding: 11px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 15px;
+    text-align: center;
+    background: #f8fafc;
+  }
+  input:focus { outline: none; border-color: var(--primary); background: #fff; }
+
+  button {
+    width: 100%;
+    padding: 12px;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  button:hover { background: var(--primary-hover); }
+
+  .btn-success { background: var(--success); }
+  .btn-success:hover { background: #059669; }
+  
+  .btn-danger { background: var(--danger); margin-top: 10px; }
+  .btn-danger:hover { background: #dc2626; }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 15px;
+  }
+  .stat-box {
+    padding: 12px;
+    border-radius: 8px;
+    text-align: center;
+    color: white;
+    font-weight: bold;
+  }
+
+  .item-box {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8fafc;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    border: 1px solid var(--border-color);
+  }
+  .item-info { text-align: right; }
+  .item-title { font-weight: bold; color: var(--text-main); font-size: 15px; }
+  .item-meta { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+  
+  .btn-del {
+    width: auto;
+    padding: 6px 12px;
+    background: #fee2e2;
+    color: var(--danger);
+    font-size: 12px;
+    border-radius: 6px;
+  }
+  .btn-del:hover { background: #fca5a5; }
+
+  .alert-msg {
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    margin-bottom: 15px;
+    text-align: center;
+    display: none;
+  }
+
+  .nav-link {
+    text-align: center;
+    margin-top: 15px;
+    font-size: 13px;
     color: var(--primary);
-    font-weight: 800;
+    cursor: pointer;
+    text-decoration: underline;
   }
 
-  /* ─── Animations ─── */
-  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-  @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-
-  .hidden { display: none !important; }
-  .page { display: none; animation: fadeIn 0.3s ease-in-out; }
-  .page.active { display: block; }
-
-  /* ─── شاشة تسجيل الدخول ─── */
-  .login-screen {
-    position: fixed; inset: 0;
-    background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #0f172a 100%);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 9999; padding: 16px;
-    animation: fadeIn 0.4s ease-out;
+  .export-btns {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
   }
-  .login-box {
-    background: #fff; border-radius: 24px; width: 100%; max-width: 380px;
-    padding: 36px 32px; text-align: center;
-    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
-    animation: slideUp 0.4s ease-out;
+  .btn-export {
+    font-size: 13px;
+    padding: 10px;
   }
-  .login-logo { font-size: 48px; margin-bottom: 8px; }
-  .login-title { font-size: 24px; font-weight: 800; color: #0f172a; margin-bottom: 4px; }
-  .login-sub { font-size: 14px; color: var(--text-muted); margin-bottom: 28px; font-weight: 500; }
-  .login-label { display: block; text-align: right; font-size: 13px; font-weight: 700; color: var(--text-main); margin-bottom: 6px; margin-top: 16px; }
-  .login-input {
-    width: 100%; padding: 13px 16px; border-radius: 10px;
-    border: 1.5px solid var(--border-color); font-size: 15px;
-    outline: none; background: #f8fafc; font-family: inherit;
-    transition: all 0.2s; text-align: right; direction: ltr;
+
+  /* جدول مخفي يُستخدم لتوليد وطباعة كشوفات الـ PDF بشكل منسق */
+  #pdf-report-template {
+    display: none;
+    padding: 30px;
+    font-family: 'Segoe UI', sans-serif;
+    direction: rtl;
   }
-  .login-input:focus { border-color: var(--primary); background: #fff; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12); }
-  .login-btn {
-    margin-top: 24px; width: 100%; padding: 14px 0; background: var(--primary); color: #fff; border: none;
-    border-radius: 10px; font-size: 16px; font-weight: 800; cursor: pointer; font-family: inherit;
-    transition: background 0.2s, transform 0.1s; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);
+  #pdf-report-template table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
   }
-  .login-btn:hover { background: var(--primary-hover); transform: translateY(-1px); }
-  .login-error { margin-top: 14px; padding: 10px 14px; border-radius: 8px; background: #fee2e2; color: #dc2626; font-size: 14px; font-weight: 600; display: none; }
-  .login-footer { margin-top: 24px; font-size: 12px; color: #94a3b8; font-weight: 500; }
-
-  /* ─── شريط المستخدم في الهيدر ─── */
-  .user-tag { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.08); border-radius: 10px; padding: 6px 12px; color: #94a3b8; font-size: 13px; font-weight: 600; }
-  .logout-btn { background: rgba(239,68,68,0.15); border: none; border-radius: 8px; padding: 6px 12px; color: #f87171; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; transition: background 0.2s; }
-  .logout-btn:hover { background: rgba(239,68,68,0.3); }
-
-  /* ─── لوحة المشرف ─── */
-  .admin-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.85); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; z-index: 8888; padding: 16px; animation: fadeIn 0.3s ease-out; }
-  .admin-panel { background: #fff; border-radius: 24px; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px rgba(0,0,0,0.4); animation: slideUp 0.3s ease-out; }
-  .admin-hdr { background: linear-gradient(135deg, #0f172a, #1e3a5f); border-radius: 24px 24px 0 0; padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; }
-  .admin-hdr-title { color: #fff; font-size: 18px; font-weight: 800; }
-  .admin-hdr-sub { color: #94a3b8; font-size: 13px; margin-top: 2px; }
-  .admin-close { background: rgba(255,255,255,0.1); border: none; border-radius: 10px; color: #fff; width: 36px; height: 36px; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
-  .admin-body { padding: 24px; }
-  .admin-section-title { font-size: 13px; font-weight: 800; color: var(--text-muted); margin-bottom: 14px; padding-bottom: 8px; border-bottom: 2px solid var(--border-color); }
-  .owner-card { background: var(--bg-color); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--border-color); transition: box-shadow 0.2s; }
-  .owner-info { flex: 1; }
-  .owner-phone { font-weight: 800; font-size: 15px; color: var(--text-main); }
-  .owner-meta { font-size: 12px; color: var(--text-muted); margin-top: 3px; font-weight: 500; }
-  .btn-del-owner { background: #fee2e2; border: none; border-radius: 8px; color: #dc2626; padding: 7px 12px; font-size: 13px; font-weight: 700; cursor: pointer; transition: background 0.2s; }
-  .btn-del-owner:hover { background: #fecaca; }
-  .add-owner-form { background: #f0fdf4; border-radius: 14px; padding: 18px; border: 1.5px dashed #86efac; margin-top: 16px; }
-  .add-owner-title { font-weight: 800; font-size: 15px; color: #15803d; margin-bottom: 14px; }
-  .btn-add-owner { width: 100%; padding: 11px; background: #16a34a; color: #fff; border: none; border-radius: 9px; font-size: 14px; font-weight: 800; cursor: pointer; transition: background 0.2s; }
-  .btn-add-owner:hover { background: #15803d; }
-  .admin-msg { padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 700; margin-top: 10px; display: none; }
-
-  /* شاشة دخول المشرف */
-  .admin-login-screen { position: fixed; inset: 0; background: linear-gradient(135deg, #0f172a, #1e3a5f); display: flex; align-items: center; justify-content: center; z-index: 9000; padding: 16px; animation: fadeIn 0.3s ease-out; }
-  .admin-login-box { background: #fff; border-radius: 24px; width: 100%; max-width: 360px; padding: 32px; text-align: center; box-shadow: 0 25px 50px rgba(0,0,0,0.5); animation: slideUp 0.3s ease-out; }
+  #pdf-report-template th, #pdf-report-template td {
+    border: 1px solid #cbd5e1;
+    padding: 12px;
+    text-align: center;
+  }
+  #pdf-report-template th {
+    background-color: #0f172a;
+    color: white;
+  }
 </style>
 </head>
 <body>
 
-<div id="toast"></div>
-
-<div class="login-screen" id="login-screen">
-  <div class="login-box">
-    <div class="login-logo">⚡</div>
-    <div class="login-title">نقطة شحن</div>
-    <div class="login-sub">نظام إدارة نقاط الشحن</div>
-
-    <label class="login-label">👤 اسم المستخدم</label>
-    <input class="login-input" type="text" id="l-phone" placeholder="اسم المستخدم" onkeydown="if(event.key==='Enter') attemptLogin()"/>
-
-    <label class="login-label">🔒 كلمة المرور</label>
-    <input class="login-input" type="password" id="l-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter') attemptLogin()"/>
-
-    <div class="login-error" id="login-error">❌ بيانات الدخول غير صحيحة أو منتهية الصلاحية!</div>
-
-    <button class="login-btn" onclick="attemptLogin()">دخول إلى لوحة التحكم</button>
-    <div class="login-footer">نظام مخصص — تصميم Aseel.kh</div>
-  </div>
-</div>
-
-<div class="hdr">
-  <div class="hdr-in">
-    <div class="logo">⚡ نقطة شحن</div>
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <div class="nav">
-        <button class="nav-btn active" onclick="goTab('dashboard')">🏠 الرئيسية</button>
-        <button class="nav-btn" onclick="goTab('add')">➕ زبون جديد</button>
-      </div>
-      <div class="user-tag" id="user-tag" style="display:none">📱 <span id="user-phone"></span></div>
-      <button class="logout-btn" id="admin-btn" onclick="openAdminLogin()" style="background:rgba(139,92,246,0.15);color:#a78bfa">🛡️ المشرف</button>
-      <button class="logout-btn" id="logout-btn" onclick="doLogout()" style="display:none">خروج</button>
-    </div>
-  </div>
-</div>
-
-<div class="body">
-
-  <div id="page-dashboard" class="page active">
-    <div class="grid4">
-      <div class="stat-box" style="border-bottom: 4px solid #3b82f6;">
-        <div class="stat-n" id="s-total" style="color:#3b82f6">0</div>
-        <div class="stat-l">إجمالي الزبائن</div>
-      </div>
-      <div class="stat-box" style="border-bottom: 4px solid #ef4444;">
-        <div class="stat-n" id="s-debt" style="color:#ef4444">0 ₪</div>
-        <div class="stat-l">ديون مستحقة</div>
-      </div>
-    </div>
-    
-    <input class="srch" placeholder="🔍 ابحث بالاسم أو رقم الهاتف..." oninput="renderList(this.value)" id="srch-inp"/>
-    <div class="list" id="cust-list"></div>
+  <div class="hdr">
+    <h1>⚡ نظام نقطة شحن الاحترافي</h1>
+    <p>إدارة الحسابات، الأرصدة، وتوليد الكشوفات السحابية</p>
   </div>
 
-  <div id="page-detail" class="page">
-    <button class="back-btn" onclick="goBack()">← العودة للقائمة</button>
-    <div class="d-card" id="detail-content"></div>
-  </div>
+  <div class="container">
 
-  <div id="page-add" class="page">
-    <div class="form-card">
-      <div class="form-title">➕ إضافة زبون جديد</div>
-      <label>اسم الزبون *</label>
-      <input type="text" id="f-name" placeholder="أدخل الاسم كاملاً" oninput="checkForm()"/>
-      <label>رقم الهاتف</label>
-      <input type="tel" id="f-phone" placeholder="مثال: 05x-xxxxxxx"/>
-      <button class="btn-primary" id="f-submit" onclick="addCustomer()" disabled>حفظ بيانات الزبون</button>
-    </div>
-  </div>
-
-</div>
-
-<div class="footer">
-  تصميم وتطوير بواسطة <span>Aseel.kh</span> ©
-</div>
-
-<div class="overlay hidden" id="topup-modal">
-  <div class="modal">
-    <div class="modal-title">💵 إضافة رصيد جديد</div>
-    <div class="modal-sub" id="topup-name"></div>
-    <input type="number" id="topup-amt" placeholder="أدخل مبلغ الشحن" style="width:100%;padding:12px 16px;border-radius:10px;border:1px solid var(--border-color);font-size:15px;outline:none;margin-top:8px;"/>
-    <div class="modal-btns">
-      <button class="btn-green" onclick="doTopup()">تأكيد الشحن</button>
-      <button class="btn-gray" onclick="closeModal('topup-modal')">إلغاء</button>
-    </div>
-  </div>
-</div>
-
-<div class="admin-login-screen hidden" id="admin-login-screen">
-  <div class="admin-login-box">
-    <div style="font-size:40px;margin-bottom:8px">🛡️</div>
-    <div style="font-size:20px;font-weight:800;color:#0f172a;margin-bottom:4px">لوحة المشرف</div>
-    
-    <label class="login-label">👤 اسم المستخدم</label>
-    <input class="login-input" type="text" id="admin-user" placeholder="اسم المستخدم" onkeydown="if(event.key==='Enter') attemptAdminLogin()"/>
-
-    <label class="login-label">🔒 كلمة المرور</label>
-    <input class="login-input" type="password" id="admin-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter') attemptAdminLogin()"/>
-
-    <div class="login-error" id="admin-login-error">❌ بيانات المشرف غير صحيحة!</div>
-
-    <button class="login-btn" onclick="attemptAdminLogin()">دخول لوحة الإدارة</button>
-    <button onclick="closeAdminLogin()" style="margin-top:12px;width:100%;padding:11px;background:transparent;border:1.5px solid #e2e8f0;border-radius:10px;font-size:14px;font-weight:700;color:#64748b;cursor:pointer;font-family:inherit">إلغاء</button>
-  </div>
-</div>
-
-<div class="admin-overlay hidden" id="admin-panel-overlay">
-  <div class="admin-panel">
-    <div class="admin-hdr">
-      <div>
-        <div class="admin-hdr-title">🛡️ لوحة إدارة المشرف</div>
-        <div class="admin-hdr-sub">إدارة الموزعين والاشتراكات عبر السحابة</div>
-      </div>
-      <button class="admin-close" onclick="closeAdminPanel()">✕</button>
-    </div>
-    <div class="admin-body">
-      <div class="admin-section-title">👥 الموزعين المسجلين في النظام</div>
-      <div id="owners-list">جاري تحميل البيانات...</div>
-
-      <div class="add-owner-form">
-        <div class="add-owner-title">➕ إضافة موزع جديد للسحابة</div>
-        <input class="admin-input" type="text" id="new-owner-phone" placeholder="اسم المستخدم للموزع" style="direction:ltr;text-align:right"/>
-        <input class="admin-input" type="text" id="new-owner-pass" placeholder="كلمة المرور"/>
-        <input class="admin-input" type="date" id="new-owner-expiry"/>
-        <button class="btn-add-owner" onclick="addOwner()">✅ إضافة وحفظ في السحابة</button>
-        <div class="admin-msg" id="admin-msg"></div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script type="module">
-// ─── استيراد دوال الفايربيس من CDN وإضافة الـ Offline Persistence ───
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
-import { 
-  getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, getDoc, setDoc, getDocs,
-  enableIndexedDbPersistence // 👈 تم إضافة استيراد دالة الأوفلاين
-} from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
-
-// ─── إعدادات مشروعك في فايربيس ───
-const firebaseConfig = {
-  apiKey: "AIzaSyCe660Vzhrw8j1ipY2ewaygox3IM47sibA",
-  authDomain: "my-charger-app.firebaseapp.com",
-  projectId: "my-charger-app",
-  storageBucket: "my-charger-app.firebasestorage.app",
-  messagingSenderId: "370638579420",
-  appId: "1:370638579420:web:6e31a040e89279c5e23619",
-  measurementId: "G-ZFN3RTZENX"
-};
-
-// تهيئة الفايربيس للعمل الشامل
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-// ─── تفعيل العمل بدون إنترنت (Offline Mode) ───
-enableIndexedDbPersistence(db).catch((err) => {
-  if (err.code == 'failed-precondition') {
-    console.warn("تنبيه: لا يمكن تفعيل الأوفلاين إذا كانت هناك عدة تبويبات مفتوحة للتطبيق.");
-  } else if (err.code == 'unimplemented') {
-    console.warn("تنبيه: هذا المتصفح لا يدعم ميزة الحفظ بدون إنترنت.");
-  }
-});
-
-// ─── المتغيرات الأساسية ───
-let currentOwner = null;
-let customers = [];
-let currentTab = 'dashboard';
-let selectedId = null;
-let activeModalId = null;
-let custRef = null;
-
-const ADMIN_USER = "Aseel.kh";
-const ADMIN_PASS = "2006910";
-
-// ─── دوال المساعدة ───
-function todayStr() { return new Date().toISOString().split('T')[0]; }
-function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-window.showToast = function(msg, color='#16a34a') {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.style.background = color; t.style.display = 'block';
-  setTimeout(() => { t.style.opacity = '0'; setTimeout(() => { t.style.display = 'none'; t.style.opacity = '1'; }, 300); }, 2500);
-}
-
-// ─── تسجيل دخول الموزع عبر السحابة ───
-window.attemptLogin = async function() {
-  const username = document.getElementById('l-phone').value.trim();
-  const pass  = document.getElementById('l-pass').value.trim();
-  const errEl = document.getElementById('login-error');
-
-  if(!username || !pass) return;
-
-  try {
-    const ownerDoc = await getDoc(doc(db, "system_owners", username));
-    const today = new Date().toISOString().split('T')[0];
-
-    if (ownerDoc.exists()) {
-      const data = ownerDoc.data();
-      if (data.pass === pass && today <= data.expiry) {
-        errEl.style.display = 'none';
-        currentOwner = username;
-        document.getElementById('login-screen').classList.add('hidden');
-        document.getElementById('user-tag').style.display = 'flex';
-        document.getElementById('logout-btn').style.display = 'block';
-        document.getElementById('user-phone').textContent = username;
-        initApp();
-      } else {
-        errEl.textContent = '❌ كلمة المرور خاطئة أو انتهى الاشتراك!';
-        errEl.style.display = 'block';
-      }
-    } else {
-      errEl.textContent = '❌ المستخدم غير موجود في النظام السحابي!';
-      errEl.style.display = 'block';
-    }
-  } catch (error) {
-    errEl.textContent = '❌ حدث خطأ في الاتصال بالسحابة';
-    errEl.style.display = 'block';
-  }
-}
-
-window.doLogout = function() {
-  if (!confirm('هل تريد تسجيل الخروج؟')) return;
-  currentOwner = null;
-  customers = [];
-  document.getElementById('login-screen').classList.remove('hidden');
-  document.getElementById('user-tag').style.display = 'none';
-  document.getElementById('logout-btn').style.display = 'none';
-  document.getElementById('l-phone').value = '';
-  document.getElementById('l-pass').value = '';
-}
-
-// ─── تهيئة التطبيق وجلب بيانات الزبائن ───
-function initApp() {
-  custRef = collection(db, "owners", currentOwner, "customers");
-  onSnapshot(query(custRef, orderBy("createdAt", "desc")), (snapshot) => {
-    customers = [];
-    snapshot.forEach((docSnap) => {
-      customers.push({ id: docSnap.id, ...docSnap.data() });
-    });
-    renderStats();
-    renderList();
-    if (selectedId) renderDetail();
-  });
-}
-
-function calcBalance(c) {
-  let b = 0;
-  if (!c.transactions) return 0;
-  for (const t of c.transactions) {
-    if (t.type === 'topup' || t.type === 'debt_payment') b += t.amount;
-    else if (t.type === 'charge') b -= 1; 
-  }
-  return b;
-}
-
-function renderStats() {
-  const totalDebt = customers.reduce((s,c) => { const b = calcBalance(c); return b < 0 ? s + Math.abs(b) : s; }, 0);
-  document.getElementById('s-total').textContent = customers.length;
-  document.getElementById('s-debt').textContent = totalDebt + ' ₪';
-}
-
-window.renderList = function(q='') {
-  const inp = document.getElementById('srch-inp');
-  if (!q && inp) q = inp.value;
-  const filtered = customers.filter(c => c.name.toLowerCase().includes(q.toLowerCase()) || (c.phone && c.phone.includes(q)));
-  
-  const el = document.getElementById('cust-list');
-  if (!filtered.length) { el.innerHTML = '<div class="empty">📭 لا يوجد زبائن مطابقين</div>'; return; }
-  
-  el.innerHTML = filtered.map(c => {
-    const bl = calcBalance(c);
-    const badgeStr = bl > 0 ? `<span class="badge" style="color:#16a34a;background:#dcfce7">رصيد: ${bl} ₪</span>` :
-                     bl < 0 ? `<span class="badge" style="color:#dc2626;background:#fee2e2">دين: ${Math.abs(bl)} ₪</span>` :
-                              `<span class="badge" style="color:#64748b;background:#f1f5f9">الرصيد صفر</span>`;
-    return `<div class="card" onclick="showDetail('${c.id}')">
-      <div class="card-l">
-        <div class="av" style="background:#eff6ff;color:#3b82f6">${c.name.charAt(0)}</div>
-        <div><div class="card-name">${esc(c.name)}</div><div class="card-sub">${c.phone || 'بدون رقم'}</div></div>
-      </div>
-      <div>${badgeStr}</div>
-    </div>`;
-  }).join('');
-}
-
-window.showDetail = function(id) {
-  selectedId = id;
-  document.getElementById('page-dashboard').classList.remove('active');
-  document.getElementById('page-detail').classList.add('active');
-  renderDetail();
-}
-
-window.goBack = function() {
-  selectedId = null;
-  document.getElementById('page-detail').classList.remove('active');
-  document.getElementById('page-dashboard').classList.add('active');
-}
-
-window.goTab = function(tab) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  currentTab = tab;
-  document.getElementById('page-'+tab).classList.add('active');
-  const idx = tab === 'dashboard' ? 0 : 1;
-  document.querySelectorAll('.nav-btn')[idx].classList.add('active');
-}
-
-window.checkForm = function() {
-  document.getElementById('f-submit').disabled = !document.getElementById('f-name').value.trim();
-}
-
-window.addCustomer = async function() {
-  const name = document.getElementById('f-name').value.trim();
-  const c = { name, phone: document.getElementById('f-phone').value.trim(), createdAt: todayStr(), transactions: [] };
-  try {
-    await addDoc(custRef, c);
-    document.getElementById('f-name').value = ''; document.getElementById('f-phone').value = '';
-    showToast(`✅ تم إضافة الزبون بنجاح`);
-    goTab('dashboard');
-  } catch (e) { showToast(`❌ فشل الحفظ السحابي`, '#dc2626'); }
-}
-
-function renderDetail() {
-  const c = customers.find(x => x.id === selectedId);
-  if (!c) return;
-  const bl = calcBalance(c);
-  document.getElementById('detail-content').innerHTML = `
-    <div class="d-hdr">
-      <div class="big-av" style="background:#eff6ff;color:#3b82f6">${c.name.charAt(0)}</div>
-      <div><div class="d-name">${esc(c.name)}</div><div class="d-sub">${esc(c.phone)}</div></div>
-    </div>
-    <div class="bal-box" style="background:#f8fafc;border:2px solid #e2e8f0">
-      <div style="font-size:14px;font-weight:700;color:var(--text-muted);margin-bottom:8px">الرصيد الحالي</div>
-      <div class="bal-n">${bl} ₪</div>
-    </div>
-    <div class="act-row">
-      <button class="btn-blue" onclick="doCharge('${c.id}')">⚡ تسجيل شحنة (-1₪)</button>
-      <button class="btn-green" onclick="openTopupModal('${c.id}')">💵 إضافة رصيد</button>
-      <button class="btn-red" onclick="deleteCust('${c.id}')">🗑️ حذف الزبون</button>
-    </div>`;
-}
-
-window.doCharge = async function(cid) {
-  const c = customers.find(x => x.id === cid);
-  const txs = c.transactions ? [...c.transactions] : [];
-  txs.push({ id: Date.now(), type: 'charge', amount: 1 });
-  try {
-    await updateDoc(doc(db, "owners", currentOwner, "customers", cid), { transactions: txs });
-    showToast('⚡ تم تسجيل الشحنة بنجاح');
-  } catch (e) { showToast('❌ فشل تحديث السحابة', '#dc2626'); }
-}
-
-window.openTopupModal = function(cid) {
-  activeModalId = cid;
-  document.getElementById('topup-amt').value = '';
-  document.getElementById('topup-modal').classList.remove('hidden');
-}
-
-window.closeModal = function(id) { document.getElementById(id).classList.add('hidden'); activeModalId = null; }
-
-window.doTopup = async function() {
-  const amt = parseFloat(document.getElementById('topup-amt').value);
-  if (!amt || amt <= 0) return;
-  const c = customers.find(x => x.id === activeModalId);
-  const txs = c.transactions ? [...c.transactions] : [];
-  txs.push({ id: Date.now(), type: 'topup', amount: amt });
-  try {
-    await updateDoc(doc(db, "owners", currentOwner, "customers", activeModalId), { transactions: txs });
-    showToast(`💵 تم شحن ${amt} ₪ بنجاح`);
-    closeModal('topup-modal');
-  } catch (e) { showToast('❌ فشل العملية', '#dc2626'); }
-}
-
-window.deleteCust = async function(cid) {
-  if (!confirm('هل أنت متأكد من حذف هذا الزبون نهائياً؟')) return;
-  try {
-    await deleteDoc(doc(db, "owners", currentOwner, "customers", cid));
-    goBack(); showToast('🗑️ تم الحذف بنجاح');
-  } catch (e) { showToast('❌ فشل الحذف', '#dc2626'); }
-}
-
-// ─── لوحة المشرف السحابية ───
-window.openAdminLogin = function() {
-  document.getElementById('admin-login-screen').classList.remove('hidden');
-  document.getElementById('admin-user').value = ''; document.getElementById('admin-pass').value = '';
-}
-
-window.closeAdminLogin = function() { document.getElementById('admin-login-screen').classList.add('hidden'); }
-
-window.attemptAdminLogin = function() {
-  const u = document.getElementById('admin-user').value.trim();
-  const p = document.getElementById('admin-pass').value.trim();
-  if (u === ADMIN_USER && p === ADMIN_PASS) {
-    document.getElementById('admin-login-screen').classList.add('hidden');
-    openAdminPanel();
-  } else {
-    document.getElementById('admin-login-error').style.display = 'block';
-  }
-}
-
-async function openAdminPanel() {
-  document.getElementById('admin-panel-overlay').classList.remove('hidden');
-  const nextYear = new Date(); nextYear.setFullYear(nextYear.getFullYear() + 1);
-  document.getElementById('new-owner-expiry').value = nextYear.toISOString().split('T')[0];
-  await renderOwnersList();
-}
-
-window.closeAdminPanel = function() { document.getElementById('admin-panel-overlay').classList.add('hidden'); }
-
-async function renderOwnersList() {
-  const el = document.getElementById('owners-list');
-  el.innerHTML = '<div style="text-align:center;color:#64748b;">جاري جلب الموزعين من السحابة...</div>';
-  try {
-    const snapshot = await getDocs(collection(db, "system_owners"));
-    if (snapshot.empty) { el.innerHTML = '<div style="text-align:center;color:#64748b;">لا يوجد موزعين مسجلين</div>'; return; }
-    
-    let html = '';
-    snapshot.forEach(docSnap => {
-      const data = docSnap.data();
-      const phone = docSnap.id;
-      html += `<div class="owner-card">
-        <div class="owner-info">
-          <div class="owner-phone">📱 ${esc(phone)}</div>
-          <div class="owner-meta">🔑 ${esc(data.pass)} | 📅 ${esc(data.expiry)}</div>
+    <div id="scr-dist-login" class="screen active">
+      <div class="card">
+        <h2>👤 تسجيل دخول الموزع</h2>
+        <div class="form-group">
+          <label>رقم حساب الموزع</label>
+          <input type="text" id="login-user" placeholder="أدخل رقم الهاتف أو الحساب">
         </div>
-        <button class="btn-del-owner" onclick="deleteOwner('${esc(phone)}')">🗑️ حذف</button>
-      </div>`;
+        <div class="form-group">
+          <label>كلمة المرور</label>
+          <input type="password" id="login-pass" placeholder="أدخل كلمة المرور">
+        </div>
+        <button id="btn-execute-dist-login">دخول الحساب</button>
+        <div class="nav-link" onclick="switchScreen('scr-admin-login')">🛡️ تسجيل دخول الإدارة (أسيـل)</div>
+      </div>
+    </div>
+
+    <div id="scr-admin-login" class="screen">
+      <div class="card">
+        <h2>🛡️ لوحة الإدارة الأمنية</h2>
+        <div class="form-group">
+          <label>اسم المشرف</label>
+          <input type="text" id="admin-user" placeholder="Aseel.kh">
+        </div>
+        <div class="form-group">
+          <label>كلمة مرور لوحة الإدارة</label>
+          <input type="password" id="admin-pass" placeholder="******">
+        </div>
+        <button id="btn-execute-admin-login">دخول اللوحة</button>
+        <div class="nav-link" onclick="switchScreen('scr-dist-login')">⬅️ العودة لشاشة الموزعين</div>
+      </div>
+    </div>
+
+    <div id="scr-admin-dashboard" class="screen">
+      <div class="card">
+        <h2>➕ إضافة موزع جديد للسحابة</h2>
+        <div id="admin-alert" class="alert-msg"></div>
+        <div class="form-group">
+          <label>رقم هاتف الموزع الجديد</label>
+          <input type="text" id="new-owner-phone" placeholder="مثال: 0599000000">
+        </div>
+        <div class="form-group">
+          <label>كلمة المرور للموزع</label>
+          <input type="text" id="new-owner-pass" placeholder="تعيين كلمة مرور">
+        </div>
+        <div class="form-group">
+          <label>تاريخ انتهاء الصلاحية</label>
+          <input type="date" id="new-owner-expiry">
+        </div>
+        <button onclick="window.addOwner()">🚀 حفظ الموزع في الـ Cloud</button>
+      </div>
+
+      <div class="card">
+        <h2>📋 الموزعون المسجلون حالياً</h2>
+        <div id="owners-list-container"></div>
+        <button class="btn-danger" onclick="switchScreen('scr-dist-login')">🚪 خروج من لوحة المشرف</button>
+      </div>
+    </div>
+
+    <div id="scr-dist-dashboard" class="screen">
+      
+      <div class="stats-grid">
+        <div class="stat-box" style="background: #0284c7;">
+          <div style="font-size: 11px;">الموزع النشط</div>
+          <div id="dist-welcome-txt" style="font-size: 14px; margin-top:3px;">-</div>
+        </div>
+        <div class="stat-box" style="background: #10b981;">
+          <div style="font-size: 11px;">الدخل اليومي الحالي</div>
+          <div id="dist-daily-income" style="font-size: 16px; margin-top:3px;">0 شيكل</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>➕ إضافة زبون جديد ونقاط شحن</h2>
+        <div id="dist-alert" class="alert-msg"></div>
+        
+        <div class="form-group">
+          <label>اسم الزبون الكامل</label>
+          <input type="text" id="cust-name" placeholder="أدخل اسم الزبون">
+        </div>
+        <div class="form-group">
+          <label>رقم هاتف الزبون</label>
+          <input type="text" id="cust-phone" placeholder="أدخل رقم هاتف الزبون">
+        </div>
+        <div class="form-group">
+          <label>قيمة الشحن (يقبل السالب والموجب)</label>
+          <input type="number" id="cust-balance" placeholder="مثال: 50 أو -20">
+        </div>
+        <button class="btn-success" onclick="window.addCustomer()">➕ تسجيل وشحن الحساب</button>
+      </div>
+
+      <div class="card">
+        <h2>📋 كشف حساب زبائني المشحونين</h2>
+        
+        <div class="export-btns">
+          <button class="btn-export" style="background:#15803d;" onclick="window.exportToExcel()">📊 كشف Excel</button>
+          <button class="btn-export" style="background:#b91c1c;" onclick="window.exportToPDF()">📄 كشف PDF مطبوع</button>
+        </div>
+
+        <div id="customers-list-container">
+          <p style="text-align:center; color:var(--text-muted); font-size:13px;">جاري تحميل الزبائن من السحابة...</p>
+        </div>
+        <button class="btn-danger" onclick="switchScreen('scr-dist-login')">🚪 تسجيل خروج الموزع</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="pdf-report-template">
+    <h2 style="text-align: center; color: #0f172a; margin-bottom: 5px;" id="pdf-header-title">كشف حساب نقطة شحن</h2>
+    <p style="text-align: center; font-size: 14px; color: #64748b;" id="pdf-header-date"></p>
+    <table>
+      <thead>
+        <tr>
+          <th>اسم الزبون</th>
+          <th>رقم الهاتف</th>
+          <th>الرصيد / الشحن</th>
+          <th>تاريخ العملة</th>
+        </tr>
+      </thead>
+      <tbody id="pdf-table-body"></tbody>
+    </table>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { 
+      initializeFirestore, 
+      persistentLocalCache, 
+      persistentMultipleTabManager, 
+      doc, setDoc, getDoc, deleteDoc, collection, getDocs, query, where 
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // ربط الفايربيس ببيانات مشروعك my-charger-app الحقيقية
+    const firebaseConfig = {
+      apiKey: "AIzaSyCe660Vzhrw8j1ipY2ewaygox3IM47sibA",
+      authDomain: "my-charger-app.firebaseapp.com",
+      projectId: "my-charger-app",
+      storageBucket: "my-charger-app.firebasestorage.app",
+      messagingSenderId: "370638579420",
+      appId: "1:370638579420:web:a44fd815db96e0dfe23619",
+      measurementId: "G-E341LTKMCT"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    
+    // تفعيل الكاش المحلي للعمل أوفلاين كأنه تطبيق موبايل حقيقي
+    const db = initializeFirestore(app, {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager()
+      })
     });
-    el.innerHTML = html;
-  } catch (e) {
-    el.innerHTML = '<div style="color:#dc2626;text-align:center;">❌ حدث خطأ في جلب البيانات</div>';
-  }
-}
 
-window.addOwner = async function() {
-  const phone = document.getElementById('new-owner-phone').value.trim();
-  const pass = document.getElementById('new-owner-pass').value.trim();
-  const expiry = document.getElementById('new-owner-expiry').value;
-  if (!phone || !pass || !expiry) { showAdminMsg('⚠️ يرجى ملء الحقول', '#fef3c7', '#92400e'); return; }
+    let activeDistributor = "";
+    let localCustomersArray = []; // لحفظ البيانات محلياً وتسهيل تصديرها
 
-  try {
-    await setDoc(doc(db, "system_owners", phone), { pass, expiry });
-    document.getElementById('new-owner-phone').value = '';
-    document.getElementById('new-owner-pass').value = '';
-    showAdminMsg(`✅ تم إضافة ${phone} للسحابة`, '#dcfce7', '#15803d');
-    renderOwnersList();
-  } catch (e) { showAdminMsg('❌ فشل الحفظ في السحابة', '#fee2e2', '#dc2626'); }
-}
+    window.switchScreen = function(screenId) {
+      document.querySelectorAll('.screen').forEach(scr => scr.classList.remove('active'));
+      document.getElementById(screenId).classList.add('active');
+      
+      if(screenId === 'scr-admin-dashboard') { renderOwnersList(); }
+      if(screenId === 'scr-dist-dashboard') { renderCustomersList(); }
+    };
 
-window.deleteOwner = async function(phone) {
-  if (!confirm(`هل تريد حذف ${phone} نهائياً من السحابة؟`)) return;
-  try {
-    await deleteDoc(doc(db, "system_owners", phone));
-    showAdminMsg(`🗑️ تم حذف ${phone}`, '#fee2e2', '#dc2626');
-    renderOwnersList();
-  } catch (e) { showAdminMsg('❌ فشل الحذف', '#fee2e2', '#dc2626'); }
-function showAdminMsg(text, bg, color) {
-  const el = document.getElementById('admin-msg');
-  if (el) {
-    el.textContent = text;
-    el.style.backgroundColor = bg;
-    el.style.color = color;
-    el.style.display = 'block';
-    setTimeout(() => { el.style.display = 'none'; }, 3000);
-  }
-}
-</script>
+    function showAlert(elementId, text, bg, color) {
+      const el = document.getElementById(elementId);
+      el.innerText = text; el.style.background = bg; el.style.color = color; el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 4000);
+    }
+
+    // ─── [أولاً: صلاحيات المشرف أصيل] ───
+    document.getElementById('btn-execute-admin-login').addEventListener('click', () => {
+      const u = document.getElementById('admin-user').value.trim();
+      const p = document.getElementById('admin-pass').value.trim();
+      if (u === "Aseel.kh" && p === "2006910") {
+        document.getElementById('admin-user').value = ""; document.getElementById('admin-pass').value = "";
+        switchScreen('scr-admin-dashboard');
+      } else { alert("❌ بيانات الدخول للمشرف غير صحيحة!"); }
+    });
+
+    async function renderOwnersList() {
+      const el = document.getElementById('owners-list-container');
+      try {
+        const querySnapshot = await getDocs(collection(db, "system_owners"));
+        if(querySnapshot.empty) {
+          el.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:13px;">⚠️ لا يوجد موزعون مسجلون حالياً</p>';
+          return;
+        }
+        let html = '';
+        querySnapshot.forEach((docSnap) => {
+          const phone = docSnap.id; const data = docSnap.data();
+          html += `
+            <div class="item-box">
+              <div class="item-info">
+                <div class="item-title">📱 الموزع: ${phone}</div>
+                <div class="item-meta">🔑 رمز: ${data.pass} | 📅 صلاحية: ${data.expiry}</div>
+              </div>
+              <button class="btn-del" onclick="window.deleteOwner('${phone}')">🗑️ حذف</button>
+            </div>`;
+        });
+        el.innerHTML = html;
+      } catch (e) { el.innerHTML = '<div style="color:red; text-align:center; font-size:13px;">❌ فشل جلب البيانات من السحابة.</div>'; }
+    }
+
+    window.addOwner = async function() {
+      const phone = document.getElementById('new-owner-phone').value.trim();
+      const pass = document.getElementById('new-owner-pass').value.trim();
+      const expiry = document.getElementById('new-owner-expiry').value;
+      if (!phone || !pass || !expiry) { showAlert('admin-alert', '⚠️ يرجى تعبئة كافة الحقول!', '#fef3c7', '#92400e'); return; }
+      try {
+        await setDoc(doc(db, "system_owners", phone), { pass, expiry });
+        document.getElementById('new-owner-phone').value = ''; document.getElementById('new-owner-pass').value = ''; document.getElementById('new-owner-expiry').value = '';
+        showAlert('admin-alert', `✅ تم حفظ الموزع ${phone} بالسحابة`, '#dcfce7', '#15803d');
+        renderOwnersList();
+      } catch (e) { showAlert('admin-alert', '❌ فشل الحفظ بالسحابة، راجع القواعد Rules', '#fee2e2', '#dc2626'); }
+    };
+
+    window.deleteOwner = async function(phone) {
+      if (!confirm(`هل أنت متأكد من حذف الموزع ${phone}؟`)) return;
+      try {
+        await deleteDoc(doc(db, "system_owners", phone));
+        showAlert('admin-alert', `🗑️ تم الحذف بنجاح`, '#fee2e2', '#dc2626');
+        renderOwnersList();
+      } catch (e) { showAlert('admin-alert', '❌ فشل الحذف', '#fee2e2', '#dc2626'); }
+    };
+
+    // ─── [ثانياً: صلاحيات الموزع وإدارة الزبائن والدخل والتقارير] ───
+    document.getElementById('btn-execute-dist-login').addEventListener('click', async () => {
+      const u = document.getElementById('login-user').value.trim();
+      const p = document.getElementById('login-pass').value.trim();
+      if (!u || !p) { alert("⚠️ يرجى إدخال الحساب وكلمة المرور!"); return; }
+      try {
+        const docRef = doc(db, "system_owners", u); const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const userData = docSnap.data();
+          if (userData.pass === p) {
+            const todayStr = new Date().toISOString().split('T')[0];
+            if (userData.expiry < todayStr) { alert("❌ هذا الحساب انتهت فترة صلاحيته، راجع الإدارة!"); } 
+            else {
+              activeDistributor = u;
+              document.getElementById('dist-welcome-txt').innerText = `${u}`;
+              switchScreen('scr-dist-dashboard');
+              document.getElementById('login-user').value = ""; document.getElementById('login-pass').value = "";
+            }
+          } else { alert("❌ كلمة المرور غير صحيحة!"); }
+        } else { alert("❌ حساب الموزع غير مسجل بالسحابة!"); }
+      } catch (error) { alert("حدث خطأ بالاتصال، تأكد من إتاحة السحابة للعمل."); }
+    });
+
+    window.addCustomer = async function() {
+      const name = document.getElementById('cust-name').value.trim();
+      const phone = document.getElementById('cust-phone').value.trim();
+      const balance = parseFloat(document.getElementById('cust-balance').value.trim());
+      if (!name || !phone || isNaN(balance)) { showAlert('dist-alert', '⚠️ يرجى تعبئة حقول الزبون كاملة وبأرقام صحيحة!', '#fef3c7', '#92400e'); return; }
+
+      // الحصول على التاريخ الحالي بنسق موحد (السنة-الشهر-اليوم) للحسابات اليومية والتقارير
+      const today = new Date();
+      const dateStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+
+      try {
+        await setDoc(doc(db, "customers", phone), {
+          name: name,
+          balance: balance,
+          distributorId: activeDistributor,
+          date: dateStr
+        });
+        document.getElementById('cust-name').value = ''; document.getElementById('cust-phone').value = ''; document.getElementById('cust-balance').value = '';
+        showAlert('dist-alert', `✅ تم تسجيل الزبون ${name} بنجاح!`, '#dcfce7', '#15803d');
+        renderCustomersList();
+      } catch (e) { showAlert('dist-alert', '❌ فشل حفظ الزبون، تفقد الاتصال.', '#fee2e2', '#dc2626'); }
+    };
+
+    async function renderCustomersList() {
+      const el = document.getElementById('customers-list-container');
+      try {
+        const q = query(collection(db, "customers"), where("distributorId", "==", activeDistributor));
+        const querySnapshot = await getDocs(q);
+        
+        localCustomersArray = []; 
+        let totalDailyIncome = 0;
+        const todayDateStr = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0') + '-' + String(new Date().getDate()).padStart(2, '0');
+
+        if(querySnapshot.empty) {
+          el.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:13px;">⚠️ لم تقم بإضافة أي زبائن بعد.</p>';
+          document.getElementById('dist-daily-income').innerText = `0 شيكل`;
+          return;
+        }
+
+        let html = '';
+        querySnapshot.forEach((docSnap) => {
+          const custPhone = docSnap.id; const data = docSnap.data();
+          localCustomersArray.push({ phone: custPhone, ...data });
+
+          // احتساب الدخل اليومي (إذا كان تاريخ العملة يطابق تاريخ اليوم الحالي)
+          if(data.date === todayDateStr) {
+            totalDailyIncome += parseFloat(data.balance);
+          }
+
+          const currentBal = parseFloat(data.balance);
+          // تنسيق اللون بناءً على القيمة (أحمر إذا كانت بالسالب، وأخضر إذا كانت موجبة)
+          const balColor = currentBal < 0 ? 'var(--danger)' : 'var(--success)';
+
+          const msgText = `عزيزي ${data.name}، تم تعديل حسابك في نقطة الشحن بقيمة: ${currentBal} شيكل.`;
+          const encodedMsg = encodeURIComponent(msgText);
+
+          html += `
+            <div class="item-box" style="border-right: 4px solid ${balColor}; flex-direction: column; align-items: flex-start; gap: 8px;">
+              <div class="item-info" style="width: 100%;">
+                <div class="item-title">👤 ${data.name}</div>
+                <div class="item-meta">📱 هاتف: ${custPhone} | 📅 تاريخ: ${data.date}</div>
+                <div class="item-meta" style="color:${balColor}; font-weight:bold;">💰 قيمة الشحن الحالي: ${currentBal} شيكل</div>
+              </div>
+              <div style="display: flex; gap: 8px; width: 100%; margin-top: 5px;">
+                <a href="sms:${custPhone}?body=${encodedMsg}" style="flex: 1; text-align: center; background: #0284c7; color: white; padding: 6px; border-radius: 6px; font-size: 12px; text-decoration: none; font-weight: bold;">💬 SMS</a>
+                <a href="https://wa.me/${custPhone}?text=${encodedMsg}" target="_blank" style="flex: 1; text-align: center; background: #25d366; color: white; padding: 6px; border-radius: 6px; font-size: 12px; text-decoration: none; font-weight: bold;">🟢 واتساب</a>
+                <button class="btn-del" onclick="window.deleteCustomer('${custPhone}')" style="margin: 0; padding: 6px 12px;">🗑️ حذف</button>
+              </div>
+            </div>`;
+        });
+        
+        el.innerHTML = html;
+        // عرض الدخل اليومي الإجمالي المحدث (موجب أو سالب) في الكرت العلوي
+        document.getElementById('dist-daily-income').innerText = `${totalDailyIncome} شيكل`;
+        
+      } catch (e) { el.innerHTML = '<div style="color:red; text-align:center; font-size:13px;">❌ فشل تحميل قائمة الزبائن.</div>'; }
+    }
+
+    window.deleteCustomer = async function(phone) {
+      if (!confirm(`هل تود بالتأكيد حذف حساب هذا الزبون نهائياً؟`)) return;
+      try {
+        await deleteDoc(doc(db, "customers", phone));
+        renderCustomersList();
+      } catch (e) { alert('❌ فشل حذف الزبون.'); }
+    };
+
+    // ─── [ثالثاً: محرك تصدير التقارير الفورية كـ Excel و PDF] ───
+    
+    // 1. التصدير لملف Excel احترافي
+    window.exportToExcel = function() {
+      if(localCustomersArray.length === 0) { alert("⚠️ لا توجد بيانات لتصديرها حالياً!"); return; }
+      
+      const excelData = localCustomersArray.map(c => ({
+        "اسم الزبون": c.name,
+        "رقم هاتف الزبون": c.phone,
+        "قيمة الرصيد (شيكل)": c.balance,
+        "تاريخ الشحن": c.date
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "الزبائن");
+      
+      // حفظ الملف باسم الموزع الحالي وتاريخ اليوم
+      const filename = `كشف_حساب_الموزع_${activeDistributor}.xlsx`;
+      XLSX.writeFile(workbook, filename);
+    };
+
+    // 2. التصدير لملف PDF منسق وجاهز للطباعة الفورية
+    window.exportToPDF = function() {
+      if(localCustomersArray.length === 0) { alert("⚠️ لا توجد بيانات لتوليد تقرير PDF!"); return; }
+      
+      document.getElementById('pdf-header-title').innerText = `كشف حساب الموزع: ${activeDistributor}`;
+      document.getElementById('pdf-header-date').innerText = `تاريخ إصدار التقرير: ${new Date().toLocaleDateString('ar-EG')}`;
+      
+      let tableRowsHtml = "";
+      localCustomersArray.forEach(c => {
+        const balStyle = c.balance < 0 ? 'color: red; font-weight: bold;' : 'color: green;';
+        tableRowsHtml += `
+          <tr>
+            <td>${c.name}</td>
+            <td>${c.phone}</td>
+            <td style="${balStyle}">${c.balance} شيكل</td>
+            <td>${c.date}</td>
+          </tr>`;
+      });
+      
+      document.getElementById('pdf-table-body').innerHTML = tableRowsHtml;
+      
+      // خيارات إخراج وتوليد الـ PDF للموبايل
+      const element = document.getElementById('pdf-report-template');
+      element.style.display = "block"; // إظهاره مؤقتاً للمحرك فقط
+      
+      const opt = {
+        margin:       10,
+        filename:     `تقرير_شحن_${activeDistributor}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+      
+      html2pdf().set(opt).from(element).save().then(() => {
+        element.style.display = "none"; // إخفاؤه مجدداً بعد إتمام التحميل
+      });
+    };
+
+  </script>
 </body>
 </html>
+
